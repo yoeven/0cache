@@ -1,20 +1,19 @@
-import { altcache } from "../index";
+import { ZeroCache } from "../index";
 
-const { cache } = altcache({
+const { cache } = ZeroCache({
   dzero_token: process.env.DZERO_TOKEN!,
 });
 
-const getData = async () => {
+const getData = async (id: string) => {
   await new Promise((resolve) => setTimeout(resolve, 2000));
   return {
-    name: "John Doe",
-    age: 30,
-    city: "New York",
+    id: id,
   };
 };
 
-const r = cache(() => getData(), ["testtag1"]);
+const r = cache(getData, ["testtag1"]);
+const data = await r("1");
 
-console.log(r);
+console.log(data);
 
 // await invalidateByTag(["testtag1"]);
