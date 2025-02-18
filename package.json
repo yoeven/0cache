@@ -1,0 +1,31 @@
+{
+  "name": "altcache",
+  "type": "module",
+  "version": "0.0.1",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "types": "./dist/index.d.ts",
+    "import": "./dist/index.js",
+    "require": "./dist/index.cjs"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "dev": "bun run example/index.ts",
+    "build": "bun run build.ts",
+    "prepublishOnly": "bun run build",
+    "format": "biome check --write ."
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/pako": "^2.0.3",
+    "bun-plugin-dts": "^0.3.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "pako": "^2.1.0"
+  }
+}
