@@ -1,6 +1,17 @@
 {
   "name": "0cache",
   "description": "Cache expensive operations and functions. Inspired by Vercel's unstable_cache",
+  "homepage": "https://github.com/yoeven/0cache",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yoeven/0cache.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yoeven/0cache/issues"
+  },
+  "keywords": ["caching", "typescript", "javascript", "sqlite", "nextjs", "vercel"],
+  "author": "yoeven",
+  "license": "MIT",
   "type": "module",
   "version": "0.0.3",
   "main": "./dist/index.cjs",

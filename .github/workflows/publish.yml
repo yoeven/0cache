@@ -1,0 +1,27 @@
+name: Deploy Package to NPM when a Release is Created
+on:
+  release:
+    types: [created]
+jobs:
+  pypi-publish:
+    name: Publish release to NPM
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.x"
+          registry-url: "https://registry.npmjs.org"
+      - name: Build package
+        run: |
+          bun install
+          bun run build
+      - name: Publish package NPM
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
+      # - name: Publish package JSR
+      #   run: npx jsr publish --allow-slow-types
