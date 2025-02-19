@@ -20,7 +20,9 @@ jobs:
           bun install
           bun run build
       - name: Publish package NPM
-        run: npm publish --registry https://registry.npmjs.org
+        run: |
+          npm adduser --registry=https://registry.npmjs.org
+          npm publish
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
       # - name: Publish package JSR
