@@ -42,7 +42,7 @@ const getCachedUser = cache(async (id: string) => getUser(id), [userID]);
 const user = await getCachedUser(userID);
 ```
 
-###Manual Cache Invalidation
+### Manual Cache Invalidation
 
 ```ts
 const { invalidateByTag } = ZeroCache();
