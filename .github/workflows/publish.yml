@@ -22,6 +22,7 @@ jobs:
       - name: Publish package NPM
         run: |
           npm adduser --registry=https://registry.npmjs.org
+          npm set //npmjs.org/:_authToken ${{ secrets.NPM_TOKEN }}
           npm publish
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
