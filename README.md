@@ -1,6 +1,6 @@
-# Alt Cache
+# 0cache
 
-Alt cache allows you to cache expensive operations in your code by simply wrapping your function with the `cache` function. This project was inspired by [Vercel's unstable_cache](https://nextjs.org/docs/app/api-reference/functions/unstable_cache) simple syntax and is built on top of [Dzero's DB](https://dzero.dev) for fast caching and smooth invalidation
+0cache allows you to cache expensive operations in your code by simply wrapping your function with the `cache` function. This project was inspired by [Vercel's unstable_cache](https://nextjs.org/docs/app/api-reference/functions/unstable_cache) simple syntax and is built on top of [Dzero's DB](https://dzero.dev) for fast caching and smooth invalidation
 
 - 🔌 Plug and play into any JS/TS project
 - 🎯 Simple wrapper syntax on any function
@@ -54,19 +54,19 @@ await invalidateByTag(userID);
 
 ```ts
 const getCachedUser = cache(async (id: string) => getUser(id), [], {
-  revalidate: 1000 * 60 * 60 * 24, 
-  waitUntil: waitUntil, 
+  revalidate: 1000 * 60 * 60 * 24,
+  waitUntil: waitUntil,
   parser: (data: string) => JSON.parse(data),
   shouldCache: (data: any) => data.length > 100,
 });
 ```
 
-| Option | Description | Type | Default |
-| ------------- | ---------------------------- | ---------------------------- | ---------------------------- |
-| `revalidate`  | The time to live (TTL) for the cache in milliseconds, up to 1 month | `number` | `604800` (1 week) |
-| `waitUntil`   | A feature that allows for promises to run in the background even when you have returned a response which is supported on platforms like [Vercel](https://vercel.com/docs/functions/vercel-functions-package#waituntil) & [Cloudflare workers](https://developers.cloudflare.com/workers/runtime-apis/context/#waituntil). Pass a `waitUntil` function and caching processes will use waitUntil to run in the background. | `(p: Promise<any>) => void` | `undefined` |
-| `parser`      | A custom parser for data retrieved from cache for special formats you would like to handle that is non-json  | `(data: string) => any` | `undefined` |
-| `shouldCache` | A custom function that will be called to determine if the data should be cached dynamically based on response. | `(data: any) => boolean` | `undefined` |
+| Option        | Description                                                                                                                                                                                                                                                                                                                                                                                                              | Type                        | Default           |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------- | ----------------- |
+| `revalidate`  | The time to live (TTL) for the cache in milliseconds, up to 1 month                                                                                                                                                                                                                                                                                                                                                      | `number`                    | `604800` (1 week) |
+| `waitUntil`   | A feature that allows for promises to run in the background even when you have returned a response which is supported on platforms like [Vercel](https://vercel.com/docs/functions/vercel-functions-package#waituntil) & [Cloudflare workers](https://developers.cloudflare.com/workers/runtime-apis/context/#waituntil). Pass a `waitUntil` function and caching processes will use waitUntil to run in the background. | `(p: Promise<any>) => void` | `undefined`       |
+| `parser`      | A custom parser for data retrieved from cache for special formats you would like to handle that is non-json                                                                                                                                                                                                                                                                                                              | `(data: string) => any`     | `undefined`       |
+| `shouldCache` | A custom function that will be called to determine if the data should be cached dynamically based on response.                                                                                                                                                                                                                                                                                                           | `(data: any) => boolean`    | `undefined`       |
 
 ### How tagging & invalidation works
 
