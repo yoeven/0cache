@@ -7,13 +7,11 @@ const { cache } = ZeroCache({
 const getData = async (id: string) => {
   await new Promise((resolve) => setTimeout(resolve, 2000));
   return {
-    id: id,
+    hey: "you",
   };
 };
 
-const r = cache(getData, ["testtag1"]);
-const data = await r("1");
+const getDataCache = cache(getData, ["testtag1"]);
+const data = await getDataCache("1");
 
 console.log(data);
-
-// await invalidateByTag(["testtag1"]);

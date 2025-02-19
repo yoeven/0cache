@@ -8,6 +8,8 @@ const ttl = {
   WEEK: 604800,
 };
 
+const checkIsJSONObject = (value: any) => Object.prototype.toString.call(value) === "[object Object]" && !Array.isArray(value);
+
 const ZeroCache = (config: {
   dzero_token: string;
   debug?: boolean;
@@ -20,7 +22,7 @@ const ZeroCache = (config: {
     cb: T,
     tags?: string[],
     options?: {
-      ttl?: number;
+      revalidate?: number;
       waitUntil?: (p: Promise<any>) => void | undefined;
       parser?: (data: string) => Awaited<ReturnType<T>>;
       shouldCache?: (data: Awaited<ReturnType<T>>) => boolean;
@@ -36,13 +38,13 @@ const ZeroCache = (config: {
       }
     }
 
-    if (options?.ttl) {
-      if (options.ttl <= 0) {
-        throw new Error("TTL must be greater than 0");
+    if (options?.revalidate) {
+      if (options.revalidate <= 0) {
+        throw new Error("revalidate must be greater than 0");
       }
 
-      if (options.ttl > ttl.MONTH) {
-        throw new Error("TTL must be less than 7 days");
+      if (options.revalidate > ttl.MONTH) {
+        throw new Error("revalidate must be less than 7 days");
       }
     }
 
@@ -55,8 +57,10 @@ const ZeroCache = (config: {
     return async (...args: Parameters<T>): Promise<Awaited<ReturnType<T>>> => {
       let cbResult: Awaited<ReturnType<T>> | undefined = undefined;
       try {
+        config?.debug && console.log("storeKey", storeKey);
         const cacheRetrievalStartTime = new Date().getTime();
         let cacheData = await db.query(`select * from cache where key = $1`, [storeKey], "all");
+
         cacheData = cacheData?.results?.[0];
         const cacheRetrievalEndTime = new Date().getTime();
         const cacheRetrievalTimeTakenSeconds = (cacheRetrievalEndTime - cacheRetrievalStartTime) / 1000;
@@ -79,21 +83,22 @@ const ZeroCache = (config: {
         }
 
         config?.debug && console.log("cache miss");
-        const taskStartTime = new Date().getTime();
         cbResult = await cb(...args);
-        const taskEndTime = new Date().getTime();
-        const timeTakenSeconds = (taskEndTime - taskStartTime) / 1000;
-        config?.debug && console.log(`Callback took ${timeTakenSeconds}s`);
+        const isAcceptableFormat =
+          checkIsJSONObject(cbResult) || typeof cbResult === "string" || typeof cbResult === "number" || typeof cbResult === "boolean";
+        config?.debug && console.log("is acceptable format: ", isAcceptableFormat);
 
         const cbResultSizeMB = Buffer.byteLength(JSON.stringify(cbResult)) / 1024 / 1024;
-        if (timeTakenSeconds > 1 && cbResultSizeMB <= 4 && (options?.shouldCache ? options.shouldCache(cbResult as Awaited<ReturnType<T>>) : true)) {
+
+        config?.debug && console.log("cb result size MB:", cbResultSizeMB);
+        if (isAcceptableFormat && cbResultSizeMB <= 4 && (options?.shouldCache ? options.shouldCache(cbResult as Awaited<ReturnType<T>>) : true)) {
           const compressed = pako.deflate(JSON.stringify(cbResult));
 
           const InsertPromise = db.query(`insert into cache (key, data, tags, ttl) values ($1, $2, $3, $4);`, [
             storeKey,
             Buffer.from(compressed).toString("binary"),
             tagString,
-            new Date().getTime() + (options?.ttl || ttl.WEEK),
+            new Date().getTime() + (options?.revalidate || ttl.WEEK),
           ]);
 
           if (options?.waitUntil) {
@@ -101,12 +106,13 @@ const ZeroCache = (config: {
           } else {
             await InsertPromise;
           }
+        } else {
+          config?.debug && console.log("caching condition not met");
         }
 
         return cbResult as Awaited<ReturnType<T>>;
       } catch (error: any) {
-        config?.debug && console.error("cache failed");
-        config?.debug && console.error(error?.message || error);
+        config?.debug && console.error("cache failed:", error?.message || error);
         return cbResult || (await cb(...args));
       }
     };
