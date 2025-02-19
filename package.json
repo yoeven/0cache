@@ -1,5 +1,6 @@
 {
   "name": "0cache",
+  "description": "Cache expensive operations and functions. Inspired by Vercel's unstable_cache",
   "type": "module",
   "version": "0.0.3",
   "main": "./dist/index.cjs",
