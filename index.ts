@@ -1,10 +1,9 @@
 import type { DBAdapter } from "./adaptors/type";
 import pako from "pako";
 import { createHash } from "crypto";
-import { dzeroAdapter, DB } from "./adaptors/dzero";
 import { postgresAdapter, postgres } from "./adaptors/postgressql";
 
-type Callback = (...args: any[]) => Promise<any>;
+type Callback = (...args: any[]) => any;
 
 const hashBinary = (buf: Buffer): string => `__bin_${buf.byteLength}_${createHash("sha256").update(buf).digest("hex")}`;
 
@@ -12,7 +11,7 @@ const processValueForKey = async (value: any): Promise<any> => {
   if (value === null || value === undefined) return value;
 
   if (typeof value === "bigint") {
-    return "";
+    return value.toString();
   }
 
   if (typeof value === "number") {
@@ -144,7 +143,8 @@ const ZeroCache = (config: ZeroCacheConfig) => {
         // console.log("args", args);
 
         const serializedArgs = await serializeArgs(args);
-        const key = `${cb.toString()}${serializedArgs}${JSON.stringify(options)}`.replaceAll(/\s/g, "");
+        const cacheOptions = { ...options, debug: undefined };
+        const key = `${cb.toString()}${serializedArgs}${JSON.stringify(cacheOptions)}`.replaceAll(/\s/g, "");
 
         // _debug && console.log("key", key);
 
@@ -163,7 +163,7 @@ const ZeroCache = (config: ZeroCacheConfig) => {
         _debug && console.log(`cache retrieval took ${cacheRetrievalTimeTakenSeconds}s`);
 
         if (cacheData?.data) {
-          if (cacheData.ttl < new Date().getTime()) {
+          if (cacheData.ttl < Math.floor(Date.now() / 1000)) {
             _debug && console.log("cache expired");
             const DeletePromise = db.deleteCacheByKey(storeKey);
             if (options?.waitUntil) {
@@ -181,7 +181,11 @@ const ZeroCache = (config: ZeroCacheConfig) => {
         _debug && console.log("cache miss");
         cbResult = await cb(...args);
         const isAcceptableFormat =
-          checkIsJSONObject(cbResult) || typeof cbResult === "string" || typeof cbResult === "number" || typeof cbResult === "boolean";
+          checkIsJSONObject(cbResult) ||
+          Array.isArray(cbResult) ||
+          typeof cbResult === "string" ||
+          typeof cbResult === "number" ||
+          typeof cbResult === "boolean";
 
         _debug && console.log("is acceptable format: ", isAcceptableFormat);
 
@@ -201,7 +205,7 @@ const ZeroCache = (config: ZeroCacheConfig) => {
             storeKey,
             Buffer.from(compressed),
             tagString,
-            new Date().getTime() + (options?.revalidate || ttl.WEEK)
+            Math.floor(Date.now() / 1000) + (options?.revalidate || ttl.WEEK)
           );
 
           if (options?.waitUntil) {
@@ -216,7 +220,7 @@ const ZeroCache = (config: ZeroCacheConfig) => {
         return cbResult as Awaited<ReturnType<T>>;
       } catch (error: any) {
         _debug && console.error("cache failed:", error?.message || error);
-        return cbResult || (await cb(...args));
+        return cbResult ?? (await cb(...args));
       }
     };
   };
@@ -236,4 +240,4 @@ const ZeroCache = (config: ZeroCacheConfig) => {
   };
 };
 
-export { ZeroCache, dzeroAdapter, postgresAdapter, postgres, DB, type DBAdapter, type ZeroCacheConfig };
+export { ZeroCache, postgresAdapter, postgres, type DBAdapter, type ZeroCacheConfig };

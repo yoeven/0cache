@@ -8,7 +8,7 @@
 - 🔄 Manual cache invalidation with tags
 - ∑ Caching of any function, not just async functions
 - ▫︎ Compression for large payloads
-- 🗄️ Bring your own database with adapters (PostgreSQL, [Dzero DB](https://dzero.dev))
+- 🗄️ Bring your own database with adapters (PostgreSQL included)
 
 ## Installation
 
@@ -24,9 +24,9 @@ bun add 0cache
 
 ## Usage
 
-Create a cache instance with a **database adapter**. Use `postgresAdapter` with [postgres.js](https://github.com/porsager/postgres) for PostgreSQL, or `dzeroAdapter` with [Dzero DB](https://dzero.dev).
+Create a cache instance with a **database adapter**. Use `postgresAdapter` with [postgres.js](https://github.com/porsager/postgres) for PostgreSQL.
 
-### Caching (PostgreSQL)
+### Quick start
 
 ```ts
 import { ZeroCache, postgresAdapter, postgres } from "0cache";
@@ -39,7 +39,9 @@ const { cache } = ZeroCache({
 
 const userID = "123";
 
-const getCachedUser = cache(async (id: string) => getUser(id), [userID]);
+const getCachedUser = cache(async (id: string) => getUser(id), {
+  tags: [userID],
+});
 
 const user = await getCachedUser(userID);
 ```
@@ -49,30 +51,10 @@ The `postgresAdapter` expects a `zero_cache` table with `key` as a unique primar
 ```sql
 CREATE TABLE zero_cache (
   key TEXT PRIMARY KEY,
-  data TEXT NOT NULL,
+  data BYTEA NOT NULL,
   tags TEXT,
   ttl BIGINT NOT NULL
 );
-```
-
-### Caching (Dzero)
-
-```ts
-import { ZeroCache, dzeroAdapter, DB } from "0cache";
-
-const { cache } = ZeroCache({
-  dbAdapter: dzeroAdapter(
-    DB("https://db.dzero.dev", {
-      token: process.env.DZERO_TOKEN!,
-    })
-  ),
-});
-
-const userID = "123";
-
-const getCachedUser = cache(async (id: string) => getUser(id), [userID]);
-
-const user = await getCachedUser(userID);
 ```
 
 ### Manual cache invalidation
@@ -91,7 +73,7 @@ await invalidateByTag([userID]);
 
 ### Other options
 
-Pass `debug: true` on `ZeroCache` to log cache keys and hits/misses.
+Pass `debug: true` on `ZeroCache` to log cache hits/misses, retrieval times, and result sizes. Can also be set per-cache.
 
 ```ts
 const { cache } = ZeroCache({
@@ -100,8 +82,8 @@ const { cache } = ZeroCache({
   maxSizeMB: 8,
 });
 
-const getCachedUser = cache(async (id: string) => getUser(id), [], {
-  revalidate: 1000 * 60 * 60 * 24,
+const getCachedUser = cache(async (id: string) => getUser(id), {
+  revalidate: 60 * 60 * 24,
   waitUntil: waitUntil,
   parser: (data: string) => JSON.parse(data),
   shouldCache: (data: any) => data.length > 100,
@@ -111,20 +93,42 @@ const getCachedUser = cache(async (id: string) => getUser(id), [], {
 
 | Option        | Description                                                                                                                                                                                                                                                                                                                                                                                                              | Type                        | Default           |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------- | ----------------- |
-| `revalidate`  | The time to live (TTL) for the cache in milliseconds, up to 1 month                                                                                                                                                                                                                                                                                                                                                      | `number`                    | `604800` (1 week) |
+| `tags`        | Array of string tags to associate with this cache entry for later invalidation. Max 10 tags with a combined 1000 character limit.                                                                                                                                                                                                                                                                                        | `string[]`                  | `[]`              |
+| `revalidate`  | The time to live (TTL) for the cache in seconds, up to 1 month                                                                                                                                                                                                                                                                                                                                                           | `number`                    | `604800` (1 week) |
 | `waitUntil`   | A feature that allows for promises to run in the background even when you have returned a response which is supported on platforms like [Vercel](https://vercel.com/docs/functions/vercel-functions-package#waituntil) & [Cloudflare workers](https://developers.cloudflare.com/workers/runtime-apis/context/#waituntil). Pass a `waitUntil` function and caching processes will use waitUntil to run in the background. | `(p: Promise<any>) => void` | `undefined`       |
 | `parser`      | A custom parser for data retrieved from cache for special formats you would like to handle that is non-json                                                                                                                                                                                                                                                                                                              | `(data: string) => any`     | `undefined`       |
 | `shouldCache` | A custom function that will be called to determine if the data should be cached dynamically based on response.                                                                                                                                                                                                                                                                                                           | `(data: any) => boolean`    | `undefined`       |
 | `maxSizeMB`   | Maximum size in MB of the data to cache. Can also be set globally on `ZeroCache` config.                                                                                                                                                                                                                                                                                                                                 | `number`                    | `4`               |
+| `effects`     | Extra key-value pairs included in the cache key. Useful for differentiating cache entries by external state like user sessions or feature flags.                                                                                                                                                                                                                                                                         | `[string, any][]`           | `undefined`       |
+| `enable`      | Set to `false` to bypass caching entirely and always call the original function.                                                                                                                                                                                                                                                                                                                                         | `boolean`                   | `true`            |
+| `debug`       | Enable debug logging for this specific cache. Overrides the global `debug` setting on `ZeroCache`.                                                                                                                                                                                                                                                                                                                       | `boolean`                   | `false`           |
+
+### Supported return types
+
+Only JSON-serializable return types are cached. If the function returns an unsupported type, it will still be returned as-is but **not** cached.
+
+| Type     | Cached |
+| -------- | ------ |
+| Object   | ✅     |
+| Array    | ✅     |
+| String   | ✅     |
+| Number   | ✅     |
+| Boolean  | ✅     |
+| `null`   | ❌     |
+| `Map`    | ❌     |
+| `Set`    | ❌     |
+| `Date`   | ❌     |
+| Class    | ❌     |
+| Function | ❌     |
 
 ### How tagging & invalidation works
 
 ```ts
-const getCachedOne = cache(async (id: string) => getUser(id), ["one", "user"]);
+const getCachedOne = cache(async (id: string) => getUser(id), { tags: ["one", "user"] });
 
-const getCachedTwo = cache(async (id: string) => getUser(id), ["two", "user"]);
+const getCachedTwo = cache(async (id: string) => getUser(id), { tags: ["two", "user"] });
 
-const getCachedThree = cache(async (id: string) => getUser(id), ["three", "user"]);
+const getCachedThree = cache(async (id: string) => getUser(id), { tags: ["three", "user"] });
 ```
 
 You can set up to 10 tags, with a total of 1000 characters. Tags are a great way to group cache together allowing you to invalidate them later.
@@ -140,6 +144,22 @@ This would invalidate cache that has both `user` and `three` tags. With the abov
 ```ts
 await invalidateByTag(["user", "three"]);
 ```
+
+### Cleaning up expired cache
+
+0cache skips expired entries on read and deletes them individually, but expired rows are not automatically purged in bulk. To keep your table lean, set up a scheduled job that deletes rows whose `ttl` is in the past.
+
+**PostgreSQL with pg_cron**
+
+```sql
+SELECT cron.schedule(
+  'purge_expired_cache',
+  '0 * * * *', -- every hour
+  $$DELETE FROM zero_cache WHERE ttl < extract(epoch from now())$$
+);
+```
+
+You can also handle this with any external cron runner or task scheduler — just run the equivalent `DELETE` query on your chosen interval.
 
 ### Custom adapters
 

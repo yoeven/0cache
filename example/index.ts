@@ -9,19 +9,27 @@ const { cache, invalidateByTag } = ZeroCache({
   debug: true,
 });
 
-const getData = async ({ id }: { id: string }) => {
-  await new Promise((resolve) => setTimeout(resolve, 2000));
+const getPDFData = async (url: string) => {
+  const data = await fetch(url);
+  const buffer = await data.arrayBuffer();
+  const base64 = Buffer.from(buffer).toString("base64");
+
+  //more complex operations
+  setTimeout(() => {
+    console.log("complex operation done");
+  }, 3000);
+
   return {
-    hey: "you",
-    id,
+    base64,
+    url,
   };
 };
 
-const getDataCache = cache(getData, {
+const getDataCache = cache(getPDFData, {
   tags: ["user_1"],
 });
 
-const data = await getDataCache({ id: "1" });
+const data = await getDataCache("https://arxiv.org/pdf/1706.03762");
 console.log(data);
 
 sql.end();
