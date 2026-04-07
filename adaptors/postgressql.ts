@@ -33,7 +33,7 @@ const postgresAdapter = (client: postgres.Sql): DBAdapter => {
     `;
   };
 
-  const insertCache = async (full_key: string, data: string, tagString: string, ttl: number) => {
+  const insertCache = async (full_key: string, data: Buffer, tagString: string, ttl: number) => {
     return await client`
       insert into zero_cache (key, data, tags, ttl) values (${full_key}, ${data}, ${tagString}, ${ttl})
     `;

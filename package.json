@@ -42,7 +42,7 @@
     "dist/**"
   ],
   "scripts": {
-    "dev": "tsx example/index.ts",
+    "dev": "tsx --env-file=.env example/index.ts",
     "build": "pkgroll --src=./",
     "format": "prettier --write ."
   },

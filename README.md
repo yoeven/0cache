@@ -1,4 +1,4 @@
-# 0cache
+# 0cache (Experimental)
 
 0cache allows you to cache expensive async/sync operations in your code by simply wrapping your function with the `cache` function. Bring your own database — 0cache uses a pluggable adapter pattern so you can store cache data wherever you want. Inspired by [Vercel's unstable_cache](https://nextjs.org/docs/app/api-reference/functions/unstable_cache).
 

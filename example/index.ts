@@ -1,7 +1,5 @@
 import { ZeroCache, postgresAdapter, postgres } from "../index";
 
-console.log(process.env.DATABASE_URL);
-
 const sql = postgres(process.env.DATABASE_URL!, {
   prepare: false,
 });
@@ -11,7 +9,7 @@ const { cache, invalidateByTag } = ZeroCache({
   debug: true,
 });
 
-const getData = async (id: string) => {
+const getData = async ({ id }: { id: string }) => {
   await new Promise((resolve) => setTimeout(resolve, 2000));
   return {
     hey: "you",
@@ -19,6 +17,11 @@ const getData = async (id: string) => {
   };
 };
 
-const getDataCache = cache(getData, ["testtag1"]);
-const data = await getDataCache("1");
+const getDataCache = cache(getData, {
+  tags: ["user_1"],
+});
+
+const data = await getDataCache({ id: "1" });
 console.log(data);
+
+sql.end();
