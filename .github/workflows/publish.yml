@@ -21,4 +21,4 @@ jobs:
           yarn build
       - name: Publish package NPM
         run: |
-          npm publish --access public
+          npm publish --access public --provenance
