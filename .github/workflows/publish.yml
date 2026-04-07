@@ -3,7 +3,7 @@ on:
   release:
     types: [created]
 jobs:
-  pypi-publish:
+  publish:
     name: Publish release to NPM
     runs-on: ubuntu-latest
     permissions:
@@ -15,10 +15,11 @@ jobs:
         with:
           node-version: "22.x"
           registry-url: "https://registry.npmjs.org"
+      - name: Install latest npm
+        run: npm install -g npm@latest
       - name: Build package
         run: |
           yarn install
           yarn build
       - name: Publish package NPM
-        run: |
-          npm publish --access public --provenance
+        run: npm publish --access public
