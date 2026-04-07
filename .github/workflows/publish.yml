@@ -11,18 +11,14 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
         with:
-          bun-version: "1.2.2"
+          node-version: "22.x"
           registry-url: "https://registry.npmjs.org"
       - name: Build package
         run: |
-          bun install
-          bun run build
+          yarn install
+          yarn build
       - name: Publish package NPM
         run: |
-          bun publish
-        env:
-          NPM_CONFIG_TOKEN: ${{secrets.NPM_TOKEN}}
-      # - name: Publish package JSR
-      #   run: npx jsr publish --allow-slow-types
+          yarn publish

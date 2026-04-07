@@ -1,16 +1,14 @@
 # 0cache
 
-0cache allows you to cache expensive operations in your code by simply wrapping your function with the `cache` function. This project was inspired by [Vercel's unstable_cache](https://nextjs.org/docs/app/api-reference/functions/unstable_cache) simple syntax and is built on top of [Dzero's DB](https://dzero.dev) for fast caching and smooth invalidation
+0cache allows you to cache expensive async/sync operations in your code by simply wrapping your function with the `cache` function. Bring your own database — 0cache uses a pluggable adapter pattern so you can store cache data wherever you want. Inspired by [Vercel's unstable_cache](https://nextjs.org/docs/app/api-reference/functions/unstable_cache).
 
 - 🔌 Plug and play into any JS/TS project
 - 🎯 Simple wrapper syntax on any function
 - 🕑 Full cache control with tags & TTL
 - 🔄 Manual cache invalidation with tags
-- 🚫 < 30ms invalidation of cached data
 - ∑ Caching of any function, not just async functions
 - ▫︎ Compression for large payloads
-- 🔒 Secure & private cache storage
-- ⚡ Blazing fast global edge cache
+- 🗄️ Bring your own database with adapters (PostgreSQL, [Dzero DB](https://dzero.dev))
 
 ## Installation
 
@@ -26,13 +24,17 @@ bun add 0cache
 
 ## Usage
 
-### Caching
+Create a cache instance with a **database adapter**. Use `postgresAdapter` with [postgres.js](https://github.com/porsager/postgres) for PostgreSQL, or `dzeroAdapter` with [Dzero DB](https://dzero.dev).
+
+### Caching (PostgreSQL)
 
 ```ts
-import { ZeroCache } from "0cache";
+import { ZeroCache, postgresAdapter, postgres } from "0cache";
+
+const sql = postgres(process.env.DATABASE_URL!);
 
 const { cache } = ZeroCache({
-  dzero_token: process.env.DZERO_TOKEN!,
+  dbAdapter: postgresAdapter(sql),
 });
 
 const userID = "123";
@@ -42,22 +44,68 @@ const getCachedUser = cache(async (id: string) => getUser(id), [userID]);
 const user = await getCachedUser(userID);
 ```
 
-### Manual Cache Invalidation
+The `postgresAdapter` expects a `zero_cache` table with `key` as a unique primary key. Example DDL:
 
-```ts
-const { invalidateByTag } = ZeroCache();
-
-await invalidateByTag(userID);
+```sql
+CREATE TABLE zero_cache (
+  key TEXT PRIMARY KEY,
+  data TEXT NOT NULL,
+  tags TEXT,
+  ttl BIGINT NOT NULL
+);
 ```
 
-### Other Options
+### Caching (Dzero)
 
 ```ts
+import { ZeroCache, dzeroAdapter, DB } from "0cache";
+
+const { cache } = ZeroCache({
+  dbAdapter: dzeroAdapter(
+    DB("https://db.dzero.dev", {
+      token: process.env.DZERO_TOKEN!,
+    })
+  ),
+});
+
+const userID = "123";
+
+const getCachedUser = cache(async (id: string) => getUser(id), [userID]);
+
+const user = await getCachedUser(userID);
+```
+
+### Manual cache invalidation
+
+Use `invalidateByTag` from the **same** `ZeroCache` instance you used for `cache`:
+
+```ts
+const { cache, invalidateByTag } = ZeroCache({
+  dbAdapter: postgresAdapter(sql),
+});
+
+await invalidateByTag([userID]);
+```
+
+`ZeroCache` also returns `clearCache()` to wipe the entire cache table.
+
+### Other options
+
+Pass `debug: true` on `ZeroCache` to log cache keys and hits/misses.
+
+```ts
+const { cache } = ZeroCache({
+  dbAdapter: postgresAdapter(sql),
+  debug: true,
+  maxSizeMB: 8,
+});
+
 const getCachedUser = cache(async (id: string) => getUser(id), [], {
   revalidate: 1000 * 60 * 60 * 24,
   waitUntil: waitUntil,
   parser: (data: string) => JSON.parse(data),
   shouldCache: (data: any) => data.length > 100,
+  maxSizeMB: 2,
 });
 ```
 
@@ -67,6 +115,7 @@ const getCachedUser = cache(async (id: string) => getUser(id), [], {
 | `waitUntil`   | A feature that allows for promises to run in the background even when you have returned a response which is supported on platforms like [Vercel](https://vercel.com/docs/functions/vercel-functions-package#waituntil) & [Cloudflare workers](https://developers.cloudflare.com/workers/runtime-apis/context/#waituntil). Pass a `waitUntil` function and caching processes will use waitUntil to run in the background. | `(p: Promise<any>) => void` | `undefined`       |
 | `parser`      | A custom parser for data retrieved from cache for special formats you would like to handle that is non-json                                                                                                                                                                                                                                                                                                              | `(data: string) => any`     | `undefined`       |
 | `shouldCache` | A custom function that will be called to determine if the data should be cached dynamically based on response.                                                                                                                                                                                                                                                                                                           | `(data: any) => boolean`    | `undefined`       |
+| `maxSizeMB`   | Maximum size in MB of the data to cache. Can also be set globally on `ZeroCache` config.                                                                                                                                                                                                                                                                                                                                 | `number`                    | `4`               |
 
 ### How tagging & invalidation works
 
@@ -75,10 +124,7 @@ const getCachedOne = cache(async (id: string) => getUser(id), ["one", "user"]);
 
 const getCachedTwo = cache(async (id: string) => getUser(id), ["two", "user"]);
 
-const getCachedThree = cache(
-  async (id: string) => getUser(id),
-  ["three", "user"]
-);
+const getCachedThree = cache(async (id: string) => getUser(id), ["three", "user"]);
 ```
 
 You can set up to 10 tags, with a total of 1000 characters. Tags are a great way to group cache together allowing you to invalidate them later.
@@ -93,6 +139,34 @@ This would invalidate cache that has both `user` and `three` tags. With the abov
 
 ```ts
 await invalidateByTag(["user", "three"]);
+```
+
+### Custom adapters
+
+You can create your own adapter by implementing the `DBAdapter` interface:
+
+```ts
+import type { DBAdapter } from "0cache";
+
+const myAdapter: DBAdapter = {
+  getCacheByKey: async (key) => {
+    /* ... */
+  },
+  deleteCacheByKey: async (key) => {
+    /* ... */
+  },
+  insertCache: async (key, data, tags, ttl) => {
+    /* ... */
+  },
+  deleteCacheByTags: async (tags) => {
+    /* ... */
+  },
+  clearAllCache: async () => {
+    /* ... */
+  },
+};
+
+const { cache } = ZeroCache({ dbAdapter: myAdapter });
 ```
 
 ## Future

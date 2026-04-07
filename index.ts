@@ -1,5 +1,7 @@
-import { DB } from "./dzero";
+import type { DBAdapter } from "./adaptors/type";
 import pako from "pako";
+import { dzeroAdapter, DB } from "./adaptors/dzero";
+import { postgresAdapter, postgres } from "./adaptors/postgressql";
 
 type Callback = (...args: any[]) => Promise<any>;
 
@@ -10,13 +12,14 @@ const ttl = {
 
 const checkIsJSONObject = (value: any) => Object.prototype.toString.call(value) === "[object Object]" && !Array.isArray(value);
 
-const ZeroCache = (config: {
-  dzero_token: string;
+type ZeroCacheConfig = {
+  dbAdapter: DBAdapter;
   debug?: boolean;
-}) => {
-  const db = DB("https://db.dzero.dev", {
-    token: config?.dzero_token || process.env.DZERO_TOKEN!,
-  });
+  maxSizeMB?: number;
+};
+
+const ZeroCache = (config: ZeroCacheConfig) => {
+  const db = config.dbAdapter;
 
   const cache = <T extends Callback>(
     cb: T,
@@ -26,6 +29,7 @@ const ZeroCache = (config: {
       waitUntil?: (p: Promise<any>) => void | undefined;
       parser?: (data: string) => Awaited<ReturnType<T>>;
       shouldCache?: (data: Awaited<ReturnType<T>>) => boolean;
+      maxSizeMB?: number;
     }
   ) => {
     if (tags?.length) {
@@ -51,7 +55,7 @@ const ZeroCache = (config: {
     tags = tags?.length ? [...new Set(tags)] : [];
     const tagString = tags.map((t) => `'${t}'`).join(",");
 
-    const key = `${cb.toString()}_${tagString}_${JSON.stringify(options)}`;
+    const key = `${cb.toString()}_${tagString}${options ? "_" + JSON.stringify(options) : ""}`;
     const storeKey = key.replaceAll(/\s/g, "");
 
     return async (...args: Parameters<T>): Promise<Awaited<ReturnType<T>>> => {
@@ -59,9 +63,10 @@ const ZeroCache = (config: {
       try {
         config?.debug && console.log("storeKey", storeKey);
         const cacheRetrievalStartTime = new Date().getTime();
-        let cacheData = await db.query(`select * from cache where key = $1`, [storeKey], "all");
+        const cacheData = await db.getCacheByKey(storeKey);
 
-        cacheData = cacheData?.results?.[0];
+        config?.debug && console.log("cacheData", cacheData);
+
         const cacheRetrievalEndTime = new Date().getTime();
         const cacheRetrievalTimeTakenSeconds = (cacheRetrievalEndTime - cacheRetrievalStartTime) / 1000;
         config?.debug && console.log(`cache retrieval took ${cacheRetrievalTimeTakenSeconds}s`);
@@ -69,7 +74,7 @@ const ZeroCache = (config: {
         if (cacheData?.data) {
           if (cacheData.ttl < new Date().getTime()) {
             config?.debug && console.log("cache expired");
-            const DeletePromise = db.query(`delete from cache where key = $1`, [storeKey]);
+            const DeletePromise = db.deleteCacheByKey(storeKey);
             if (options?.waitUntil) {
               options.waitUntil(DeletePromise);
             } else {
@@ -90,16 +95,22 @@ const ZeroCache = (config: {
 
         const cbResultSizeMB = Buffer.byteLength(JSON.stringify(cbResult)) / 1024 / 1024;
 
+        const maxSize = options?.maxSizeMB ?? config?.maxSizeMB ?? 4;
+
         config?.debug && console.log("cb result size MB:", cbResultSizeMB);
-        if (isAcceptableFormat && cbResultSizeMB <= 4 && (options?.shouldCache ? options.shouldCache(cbResult as Awaited<ReturnType<T>>) : true)) {
+        if (
+          isAcceptableFormat &&
+          cbResultSizeMB <= maxSize &&
+          (options?.shouldCache ? options.shouldCache(cbResult as Awaited<ReturnType<T>>) : true)
+        ) {
           const compressed = pako.deflate(JSON.stringify(cbResult));
 
-          const InsertPromise = db.query(`insert into cache (key, data, tags, ttl) values ($1, $2, $3, $4);`, [
+          const InsertPromise = db.insertCache(
             storeKey,
             Buffer.from(compressed).toString("binary"),
             tagString,
-            new Date().getTime() + (options?.revalidate || ttl.WEEK),
-          ]);
+            new Date().getTime() + (options?.revalidate || ttl.WEEK)
+          );
 
           if (options?.waitUntil) {
             options.waitUntil(InsertPromise);
@@ -118,12 +129,12 @@ const ZeroCache = (config: {
     };
   };
 
-  const invalidateByTag = async (tag: string[]) => {
-    await db.query(`DELETE FROM cache WHERE ${tag.map((t) => `instr(tags, '${t}') > 0`).join(" AND ")};`);
+  const invalidateByTag = async (tags: string[]) => {
+    await db.deleteCacheByTags(tags);
   };
 
   const clearCache = async () => {
-    await db.query(`DELETE FROM cache`);
+    await db.clearAllCache();
   };
 
   return {
@@ -133,4 +144,4 @@ const ZeroCache = (config: {
   };
 };
 
-export { ZeroCache };
+export { ZeroCache, dzeroAdapter, postgresAdapter, postgres, DB, type DBAdapter, type ZeroCacheConfig };

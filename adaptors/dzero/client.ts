@@ -37,11 +37,7 @@ export const DB = (url: string, header: Record<string, string>) => {
     );
   };
 
-  const dump = (option: {
-    tables?: string[];
-    schema?: boolean;
-    data?: boolean;
-  }) => {
+  const dump = (option: { tables?: string[]; schema?: boolean; data?: boolean }) => {
     return fetchDB(option || {}, "/dump");
   };
 

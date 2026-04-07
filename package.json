@@ -1,6 +1,6 @@
 {
   "name": "0cache",
-  "description": "Cache expensive operations and functions. Inspired by Vercel's unstable_cache",
+  "description": "Cache expensive async/sync fetch and functions on any database. Inspired by Vercel's unstable_cache",
   "homepage": "https://github.com/yoeven/0cache",
   "repository": {
     "type": "git",
@@ -9,11 +9,19 @@
   "bugs": {
     "url": "https://github.com/yoeven/0cache/issues"
   },
-  "keywords": ["caching", "typescript", "javascript", "sqlite", "nextjs", "vercel"],
+  "keywords": [
+    "caching",
+    "typescript",
+    "javascript",
+    "postgresql",
+    "nextjs",
+    "vercel"
+  ],
   "author": "yoeven",
   "license": "MIT",
   "type": "module",
-  "version": "0.0.3",
+  "version": "0.0.4",
+  "packageManager": "yarn@1.22.22",
   "engines": {
     "node": ">=18"
   },
@@ -21,26 +29,36 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    "types": "./dist/index.d.ts",
-    "import": "./dist/index.js",
-    "require": "./dist/index.cjs"
+    "require": {
+      "types": "./dist/index.d.cts",
+      "default": "./dist/index.cjs"
+    },
+    "import": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    }
   },
-  "files": ["dist/**"],
+  "files": [
+    "dist/**"
+  ],
   "scripts": {
-    "dev": "bun run example/index.ts",
-    "build": "bun run build.ts",
-    "prepublishOnly": "bun run build",
-    "format": "biome check --write ."
+    "dev": "tsx example/index.ts",
+    "build": "pkgroll --src=./",
+    "format": "prettier --write ."
   },
   "devDependencies": {
-    "@types/bun": "latest",
+    "@types/node": "^25.5.2",
     "@types/pako": "^2.0.3",
-    "bun-plugin-dts": "^0.3.0"
+    "pkgroll": "^2.27.0",
+    "prettier": "^3.8.1",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "pako": "^2.1.0"
+    "pako": "^2.1.0",
+    "postgres": "^3.4.9"
   }
 }
