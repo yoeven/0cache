@@ -1,6 +1,6 @@
 # 0cache (Experimental)
 
-0cache allows you to cache expensive async/sync operations in your code by simply wrapping your function with the `cache` function. Bring your own database — 0cache uses a pluggable adapter pattern so you can store cache data wherever you want. Inspired by [Vercel's unstable_cache](https://nextjs.org/docs/app/api-reference/functions/unstable_cache).
+0cache allows you to cache expensive async/sync operations in your code by simply wrapping your TS/JS function with the `cache` function.
 
 - 🔌 Plug and play into any JS/TS project
 - 🎯 Simple wrapper syntax on any function
@@ -9,6 +9,7 @@
 - ∑ Caching of any function, not just async functions
 - ▫︎ Compression for large payloads
 - 🗄️ Bring your own database with adapters (PostgreSQL included)
+- Initially inspired by [Vercel's unstable_cache](https://nextjs.org/docs/app/api-reference/functions/unstable_cache).
 
 ## Installation
 
@@ -33,17 +34,30 @@ import { ZeroCache, postgresAdapter, postgres } from "0cache";
 
 const sql = postgres(process.env.DATABASE_URL!);
 
-const { cache } = ZeroCache({
+const { cache, invalidateByTag } = ZeroCache({
   dbAdapter: postgresAdapter(sql),
+  debug: true,
 });
 
-const userID = "123";
+// An expensive operation you want to cache
+const getPDFData = async (url: string) => {
+  const data = await fetch(url);
+  const buffer = await data.arrayBuffer();
+  const base64 = Buffer.from(buffer).toString("base64");
 
-const getCachedUser = cache(async (id: string) => getUser(id), {
-  tags: [userID],
+  return { base64, url };
+};
+
+// Wrap with cache — subsequent calls with the same args skip the fetch entirely
+const getDataCache = cache(getPDFData, {
+  tags: ["user_1"],
 });
 
-const user = await getCachedUser(userID);
+const data = await getDataCache("https://arxiv.org/pdf/1706.03762");
+console.log(data);
+
+// Invalidate when the underlying data changes
+await invalidateByTag(["user_1"]);
 ```
 
 The `postgresAdapter` expects a `zero_cache` table with `key` as a unique primary key. Example DDL:
@@ -57,19 +71,7 @@ CREATE TABLE zero_cache (
 );
 ```
 
-### Manual cache invalidation
-
-Use `invalidateByTag` from the **same** `ZeroCache` instance you used for `cache`:
-
-```ts
-const { cache, invalidateByTag } = ZeroCache({
-  dbAdapter: postgresAdapter(sql),
-});
-
-await invalidateByTag([userID]);
-```
-
-`ZeroCache` also returns `clearCache()` to wipe the entire cache table.
+`ZeroCache` also returns `invalidateByTag()` and `clearCache()` — use them from the **same** instance you used for `cache`.
 
 ### Other options
 
@@ -189,9 +191,18 @@ const myAdapter: DBAdapter = {
 const { cache } = ZeroCache({ dbAdapter: myAdapter });
 ```
 
+## Why not a Redis database?
+
+Redis is great, but tag-based invalidation gets messy. You either need to scan keys or maintain separate sets to track which keys belong to which tags, that means more round trips and extra bookkeeping just to delete a single group of entries.
+
+With a relational database like PostgreSQL, tags can be stored as a text column and invalidated with a simple substring match in a single query. One `DELETE` statement with a `LIKE` or pattern check handles what would take multiple commands and bookkeeping in Redis, no extra data structures, no multi-step coordination.
+
+If tag-based invalidation is core to your caching strategy, a relational database keeps things simpler and more predictable.
+
 ## Future
 
 - [ ] Add support for non-json objects such as images etc with compression and s3 storage
+- [ ] Storing larger responses in S3 bucket and mapping the ID to database
 
 I'm open to suggestions and ideas that make caching even simpler, feel free to reach out!
 

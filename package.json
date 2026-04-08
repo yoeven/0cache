@@ -20,7 +20,7 @@
   "author": "yoeven",
   "license": "MIT",
   "type": "module",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "packageManager": "yarn@1.22.22",
   "engines": {
     "node": ">=18"

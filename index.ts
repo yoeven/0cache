@@ -96,7 +96,7 @@ const ZeroCache = (config: ZeroCacheConfig) => {
   const cache = <T extends Callback>(
     cb: T,
     options?: {
-      effects?: [string, any][];
+      effects?: (string | any)[];
       tags?: string[];
       revalidate?: number;
       waitUntil?: (p: Promise<any>) => void | undefined;
@@ -143,8 +143,9 @@ const ZeroCache = (config: ZeroCacheConfig) => {
         // console.log("args", args);
 
         const serializedArgs = await serializeArgs(args);
-        const cacheOptions = { ...options, debug: undefined };
-        const key = `${cb.toString()}${serializedArgs}${JSON.stringify(cacheOptions)}`.replaceAll(/\s/g, "");
+        const serializedEffects = await serializeArgs(options?.effects || []);
+        const cacheOptions = { ...options, debug: undefined, effects: undefined };
+        const key = `${cb.toString()}${serializedArgs}${serializedEffects}${JSON.stringify(cacheOptions)}`.replaceAll(/\s/g, "");
 
         // _debug && console.log("key", key);
 
