@@ -14,10 +14,10 @@ const getPDFData = async (url: string) => {
   const buffer = await data.arrayBuffer();
   const base64 = Buffer.from(buffer).toString("base64");
 
-  //more complex operations
+  //complex operations like LLM call for OCR
   setTimeout(() => {
     console.log("complex operation done");
-  }, 3000);
+  }, 5000);
 
   return {
     base64,
