@@ -2,6 +2,8 @@
 
 0cache allows you to cache expensive async/sync operations in your code by simply wrapping your TS/JS function with the `cache` function.
 
+![architecture](/architecture.png)
+
 - 🔌 Plug and play into any JS/TS project
 - 🎯 Simple wrapper syntax on any function
 - 🕑 Full cache control with tags & TTL

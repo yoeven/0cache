@@ -133,6 +133,7 @@ const ZeroCache = (config: ZeroCacheConfig) => {
 
     return async (...args: Parameters<T>): Promise<Awaited<ReturnType<T>>> => {
       let cbResult: Awaited<ReturnType<T>> | undefined = undefined;
+      let isCalled = false;
       const _debug = options?.debug ?? config?.debug ?? false;
       try {
         if (options?.enable === false) {
@@ -181,6 +182,7 @@ const ZeroCache = (config: ZeroCacheConfig) => {
 
         _debug && console.log("cache miss");
         cbResult = await cb(...args);
+        isCalled = true;
         const isAcceptableFormat =
           checkIsJSONObject(cbResult) ||
           Array.isArray(cbResult) ||
@@ -221,7 +223,7 @@ const ZeroCache = (config: ZeroCacheConfig) => {
         return cbResult as Awaited<ReturnType<T>>;
       } catch (error: any) {
         _debug && console.error("cache failed:", error?.message || error);
-        return cbResult ?? (await cb(...args));
+        return isCalled ? (cbResult as Awaited<ReturnType<T>>) : await cb(...args);
       }
     };
   };
